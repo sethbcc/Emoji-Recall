@@ -1,95 +1,251 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Emoji Recall</title>
-    <!-- Link to CSS stylesheet -->
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#17152c">
+  <title>Emoji Recall</title>
+  <link rel="stylesheet" href="style.css">
+
+  <script>
+    // Add your private backend URL here later.
+    // Never put your AI API key in this file.
+    window.EMOJI_RECALL_AI_ENDPOINT = "";
+  </script>
+
+  <script src="generator.js" defer></script>
+  <script src="editor.js" defer></script>
+  <script src="scorer.js" defer></script>
+  <script src="game.js" defer></script>
 </head>
 <body>
+  <header class="topbar">
+    <a class="brand" href="#" id="brand-home">
+      <span class="brand-mark">🧩</span>
+      <span>Emoji<span class="brand-accent">Recall</span></span>
+    </a>
+    <span class="top-pill">
+      <span class="status-dot"></span> MEMORY CHALLENGE
+    </span>
+  </header>
 
-    <!-- Game Title Header -->
-    <header>
-        <h1>Emoji Recall</h1>
-        <p>Memorize the emoji and reconstruct it before time runs out!</p>
-    </header>
+  <main>
+    <!-- HOME SCREEN -->
+    <section id="home-screen" class="screen hero-screen">
+      <div class="hero-copy">
+        <p class="eyebrow">A tiny test for your big brain</p>
+        <h1>Remember it.<br><span>Rebuild it.</span></h1>
+        <p class="hero-description">
+          A unique emoji character appears for 10 seconds.
+          Study every detail, then rebuild it before time runs out.
+        </p>
+        <button id="play-button" class="button button-primary button-large">
+          Play now <span>→</span>
+        </button>
+        <div class="hero-notes">
+          <span>◷ 10 sec to memorize</span>
+          <span>◷ 60 sec to rebuild</span>
+        </div>
+      </div>
 
-    <!-- Main Game Container -->
-    <main>
-        
-        <!-- Screen 1: Target Preview Screen (10-Second Memorization) -->
-        <section id="preview-screen">
-            <h2>Memorize This Emoji!</h2>
-            <div id="timer">Time Remaining: <span id="time-left">10</span>s</div>
-            <!-- Canvas where the target emoji will render -->
-            <canvas id="target-canvas" width="300" height="300"></canvas>
-        </section>
+      <div class="hero-art">
+        <div class="art-orbit orbit-one"></div>
+        <div class="art-orbit orbit-two"></div>
+        <span class="float-emoji e1">🌈</span>
+        <span class="float-emoji e2">🦊</span>
+        <span class="float-emoji e3">⭐</span>
+        <span class="float-emoji e4">💎</span>
+        <div class="art-card">
+          <span class="art-crown">👑</span>
+          <span class="art-face">😎</span>
+          <span class="art-flame">🔥</span>
+        </div>
+        <span class="art-caption">YOUR NEXT CHALLENGE</span>
+      </div>
 
-        <!-- Screen 2: Assembly Workspace (Reconstruction Phase) -->
-        <section id="workspace-screen" class="hidden">
-            <h2>Reconstruct the Emoji</h2>
-            
-            <div class="game-area">
-                <!-- Part Selector Tray (Decoys + Real Parts) -->
-                <div id="part-tray" class="tray">
-                    <h3>Parts Tray</h3>
-                    <!-- Parts/Icons will be dynamically injected here via JS -->
-                </div>
+      <div class="feature-row">
+        <article>
+          <span class="feature-icon">👀</span>
+          <b>Look closely</b>
+          <p>Memorize the tiny details.</p>
+        </article>
+        <article>
+          <span class="feature-icon">🎨</span>
+          <b>Build your version</b>
+          <p>Move, resize, rotate and tint.</p>
+        </article>
+        <article>
+          <span class="feature-icon">🏆</span>
+          <b>See your score</b>
+          <p>Find out how close you got.</p>
+        </article>
+      </div>
+    </section>
 
-                <!-- Interactive Assembly Canvas -->
-                <div class="canvas-container">
-                    <canvas id="editor-canvas" width="300" height="300"></canvas>
-                </div>
+    <!-- MEMORIZATION SCREEN -->
+    <section id="preview-screen" class="screen game-screen hidden">
+      <div class="screen-heading">
+        <div>
+          <p class="eyebrow">ROUND 01 / MEMORY</p>
+          <h2>Memorize this character</h2>
+          <p class="muted">
+            Look at the emoji, its placement, size, rotation and tint.
+          </p>
+        </div>
+        <div class="timer-box">
+          <span>TIME TO MEMORIZE</span>
+          <strong id="preview-timer">10</strong>
+          <small>seconds</small>
+        </div>
+      </div>
 
-                <!-- Controls & Palette -->
-                <div id="controls">
-                    <h3>Palette & Tools</h3>
-                    <!-- Color Swatches -->
-                    <div id="color-palette"></div>
-                    
-                    <!-- Transformation Buttons -->
-                    <button id="btn-rotate">Rotate 45°</button>
-                    <button id="btn-scale-up">Scale Up</button>
-                    <button id="btn-scale-down">Scale Down</button>
-                    <button id="btn-duplicate">Duplicate</button>
-                    <button id="btn-delete">Delete</button>
-                </div>
-            </div>
+      <div class="stage preview-stage">
+        <div class="stage-grid"></div>
+        <canvas id="target-canvas" width="600" height="420"></canvas>
+        <div class="stage-label">MEMORIZE EVERY DETAIL</div>
+      </div>
+      <p class="center-note">
+        The character will disappear when the countdown ends.
+      </p>
+    </section>
 
-            <button id="btn-submit">Submit Reconstruction</button>
-        </section>
+    <!-- EDITOR SCREEN -->
+    <section id="editor-screen" class="screen game-screen hidden">
+      <div class="screen-heading editor-heading">
+        <div>
+          <p class="eyebrow">ROUND 02 / REBUILD</p>
+          <h2>Make it from memory</h2>
+          <p class="muted">
+            Drag pieces onto the canvas. Select a placed piece to edit it.
+          </p>
+        </div>
+        <div class="timer-box timer-live">
+          <span>TIME LEFT</span>
+          <strong id="game-timer">60</strong>
+          <small>seconds</small>
+        </div>
+      </div>
 
-        <!-- Screen 3: Results & Social Share Card -->
-        <section id="results-screen" class="hidden">
-            <h2>Results</h2>
-            <div class="score-display">
-                <h3>Accuracy: <span id="accuracy-score">0</span>%</h3>
-            </div>
-            
-            <!-- Side-by-side "Expectation vs. Reality" Canvas -->
-            <div class="comparison-container">
-                <div>
-                    <h4>Target (Expectation)</h4>
-                    <canvas id="final-target" width="200" height="200"></canvas>
-                </div>
-                <div>
-                    <h4>Your Creation (Reality)</h4>
-                    <canvas id="final-creation" width="200" height="200"></canvas>
-                </div>
-            </div>
+      <div class="editor-layout">
+        <aside class="tool-panel">
+          <div class="panel-title">
+            <span>Emoji tray</span>
+            <span class="mini-tag">+ DECOYS</span>
+          </div>
+          <p class="panel-help">
+            Tap or drag an emoji to add it. Some pieces are decoys!
+          </p>
+          <div id="emoji-tray" class="emoji-tray"></div>
 
-            <button id="btn-share">Share Result</button>
-            <button id="btn-play-again">Play Again</button>
-        </section>
+          <div class="panel-divider"></div>
+          <div class="panel-title">Color tint</div>
+          <div id="color-palette" class="color-palette">
+            <button class="swatch selected" data-tint="#ffffff"
+              style="--swatch:#ffffff" aria-label="Original color"></button>
+            <button class="swatch" data-tint="#ff718b"
+              style="--swatch:#ff718b" aria-label="Pink tint"></button>
+            <button class="swatch" data-tint="#ffc857"
+              style="--swatch:#ffc857" aria-label="Yellow tint"></button>
+            <button class="swatch" data-tint="#72e6bd"
+              style="--swatch:#72e6bd" aria-label="Mint tint"></button>
+            <button class="swatch" data-tint="#75a7ff"
+              style="--swatch:#75a7ff" aria-label="Blue tint"></button>
+            <button class="swatch" data-tint="#c69bff"
+              style="--swatch:#c69bff" aria-label="Purple tint"></button>
+          </div>
 
-    </main>
+          <div class="panel-divider"></div>
+          <div class="panel-title">Selected piece</div>
+          <p id="selection-hint" class="panel-help">
+            Select a piece on the canvas to edit it.
+          </p>
 
-    <!-- Script imports at the bottom so HTML loads first -->
-    <script src="generator.js"></script>
-    <script src="editor.js"></script>
-    <script src="scorer.js"></script>
-    <script src="game.js"></script>
+          <label class="control-label" for="size-control">
+            Size <output id="size-value">1.0×</output>
+          </label>
+          <input id="size-control" type="range"
+            min="0.5" max="2" step="0.1" value="1" disabled>
 
+          <div class="tool-buttons">
+            <button id="rotate-button" class="button button-tool" disabled>
+              ↻ Rotate 45°
+            </button>
+            <button id="duplicate-button" class="button button-tool" disabled>
+              ＋ Duplicate
+            </button>
+            <button id="delete-button"
+              class="button button-tool button-danger" disabled>
+              ✕ Remove
+            </button>
+          </div>
+          <p id="editor-message" class="editor-message" role="status"></p>
+        </aside>
+
+        <div class="workspace-column">
+          <div class="workspace-topline">
+            <span>YOUR CANVAS</span>
+            <span id="piece-count">0 pieces</span>
+          </div>
+          <div class="stage workspace-stage">
+            <div class="stage-grid"></div>
+            <canvas id="editor-canvas" width="600" height="420"></canvas>
+          </div>
+          <div class="workspace-footer">
+            <span>Tip: details matter more than speed.</span>
+            <button id="submit-button" class="button button-primary">
+              Submit build <span>→</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESULTS SCREEN -->
+    <section id="results-screen" class="screen results-screen hidden">
+      <div class="results-heading">
+        <p class="eyebrow">ROUND COMPLETE</p>
+        <h2 id="result-title">Look at you!</h2>
+        <p id="result-subtitle" class="muted">
+          Here’s how your memory held up.
+        </p>
+      </div>
+
+      <div class="score-ring" id="score-ring">
+        <div>
+          <strong id="score-value">0%</strong>
+          <span>ACCURACY</span>
+        </div>
+      </div>
+
+      <div class="comparison-grid">
+        <article class="comparison-card">
+          <div class="comparison-label">THE ORIGINAL</div>
+          <canvas id="result-target-canvas" width="600" height="420"></canvas>
+        </article>
+        <article class="comparison-card">
+          <div class="comparison-label">YOUR REBUILD</div>
+          <canvas id="result-player-canvas" width="600" height="420"></canvas>
+        </article>
+      </div>
+
+      <p id="score-breakdown" class="score-breakdown"></p>
+      <div class="result-actions">
+        <button id="again-button" class="button button-primary button-large">
+          Play again ↻
+        </button>
+        <button id="menu-button" class="button button-secondary button-large">
+          Back to menu
+        </button>
+      </div>
+      <p class="share-note">
+        Your score compares emoji choices, position, size, rotation and tint.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <span>EMOJI RECALL</span>
+    <span>Made for curious minds ✦</span>
+  </footer>
 </body>
 </html>
