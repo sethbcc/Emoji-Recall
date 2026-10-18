@@ -1,254 +1,420 @@
-/* ==========================================================================
-   EDITOR WORKSPACE (editor.js)
-   Manages user interaction on the assembly canvas, tray items, selection state,
-   and transformation tools (rotation, scaling, color tints, deletion).
-   ========================================================================== */
+(() => {
+  "use strict";
 
-// Workspace State
-let userLayers = [];
-let selectedLayerIndex = null;
-let isDragging = false;
-let dragOffsetX = 0;
-let dragOffsetY = 0;
+  const W = 600;
+  const H = 420;
 
-/**
- * Initializes the editor workspace, populating the tray and event listeners.
- */
-function initEditor(palette) {
-    setupPartTray();
-    setupColorPalette(palette);
-    setupCanvasListeners();
-    setupToolButtons();
-}
+  const $ = id => document.getElementById(id);
 
-/**
- * Populates the Part Tray with items from PART_CATALOG (Real parts + Decoys)
- */
-function setupPartTray() {
-    const trayContainer = document.getElementById('part-tray');
-    if (!trayContainer) return;
+  let canvas;
+  let ctx;
+  let items = [];
+  let selectedId = null;
+  let currentTint = "#ffffff";
+  let onChange = () => {};
+  let pointerMode = null;
+  let lastPointer = null;
+  let dropBound = false;
 
-    // Clear existing contents except title
-    trayContainer.innerHTML = '<h3>Parts Tray</h3>';
+  function fitCanvas(c) {
+    const ratio = window.devicePixelRatio || 1;
+    const rect = c.getBoundingClientRect();
 
-    const grid = document.createElement('div');
-    grid.className = 'part-grid';
+    c.width = W * ratio;
+    c.height = H * ratio;
 
-    PART_CATALOG.forEach(part => {
-        const item = document.createElement('div');
-        item.className = 'part-item';
-        item.innerText = part.name;
-        
-        // Clicking a tray item adds it to the center of the workspace canvas
-        item.addEventListener('click', () => {
-            addPartToWorkspace(part);
-        });
+    const context = c.getContext("2d");
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
 
-        grid.appendChild(item);
+    return context;
+  }
+
+  function setupCanvas(c) {
+    canvas = c;
+    ctx = fitCanvas(canvas);
+
+    canvas.addEventListener("pointerdown", handlePointerDown);
+    canvas.addEventListener("pointermove", handlePointerMove);
+    canvas.addEventListener("pointerup", handlePointerUp);
+    canvas.addEventListener("pointercancel", handlePointerUp);
+
+    window.addEventListener("resize", () => {
+      if (canvas) draw();
     });
 
-    trayContainer.appendChild(grid);
-}
+    draw();
+  }
 
-/**
- * Adds a new part instance onto the workspace canvas
- */
-function addPartToWorkspace(part) {
-    const newLayer = {
-        instanceId: Date.now() + Math.random(), // Unique identifier
-        id: part.id,
-        type: part.type,
-        name: part.name,
-        color: COLOR_PALETTE[0], // Default to first color
-        x: 150, // Center of 300x300 canvas
-        y: 150,
-        scale: 1.0,
-        rotation: 0
+  function normalizedPoint(event) {
+    const r = canvas.getBoundingClientRect();
+
+    return {
+      x: (event.clientX - r.left) / r.width * W,
+      y: (event.clientY - r.top) / r.height * H
+    };
+  }
+
+  function emojiSize(item) {
+    return 58 * (item.size || 1);
+  }
+
+  function hitTest(point) {
+    for (let i = items.length - 1; i >= 0; i--) {
+      const item = items[i];
+      const radius = emojiSize(item) * 0.72;
+
+      const x = item.x / 100 * W;
+      const y = item.y / 100 * H;
+
+      if (Math.hypot(point.x - x, point.y - y) < radius) {
+        return item;
+      }
+    }
+
+    return null;
+  }
+
+  function handlePointerDown(event) {
+    if (!canvas) return;
+
+    const p = normalizedPoint(event);
+    const found = hitTest(p);
+
+    canvas.setPointerCapture?.(event.pointerId);
+
+    if (found) {
+      selectedId = found.id;
+      pointerMode = "move";
+      lastPointer = p;
+
+      syncControls();
+      draw();
+    } else {
+      selectedId = null;
+      pointerMode = null;
+
+      syncControls();
+      draw();
+    }
+  }
+
+  function handlePointerMove(event) {
+    if (
+      pointerMode !== "move" ||
+      !lastPointer ||
+      !selectedId
+    ) {
+      return;
+    }
+
+    const p = normalizedPoint(event);
+    const item = items.find(x => x.id === selectedId);
+
+    if (!item) return;
+
+    item.x = Math.max(
+      5,
+      Math.min(95, item.x + (p.x - lastPointer.x) / W * 100)
+    );
+
+    item.y = Math.max(
+      7,
+      Math.min(93, item.y + (p.y - lastPointer.y) / H * 100)
+    );
+
+    lastPointer = p;
+
+    draw();
+    onChange(items);
+  }
+
+  function handlePointerUp() {
+    pointerMode = null;
+    lastPointer = null;
+  }
+
+  function drawItems(targetCtx, drawItemsList, selection = null) {
+    targetCtx.clearRect(0, 0, W, H);
+
+    drawItemsList.forEach(item => {
+      const x = item.x / 100 * W;
+      const y = item.y / 100 * H;
+      const size = emojiSize(item);
+
+      targetCtx.save();
+
+      targetCtx.translate(x, y);
+      targetCtx.rotate((item.rotation || 0) * Math.PI / 180);
+
+      targetCtx.font =
+        `${size}px "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Emoji", sans-serif`;
+
+      targetCtx.textAlign = "center";
+      targetCtx.textBaseline = "middle";
+
+      // Tint overlay behind the emoji.
+      if (item.tint && item.tint !== "#ffffff") {
+        targetCtx.globalAlpha = 0.18;
+        targetCtx.fillStyle = item.tint;
+
+        targetCtx.beginPath();
+        targetCtx.arc(0, 0, size * 0.49, 0, Math.PI * 2);
+        targetCtx.fill();
+
+        targetCtx.globalAlpha = 1;
+      }
+
+      targetCtx.fillText(item.emoji, 0, 0);
+      targetCtx.restore();
+
+      // Selection indicator.
+      if (selection === item.id) {
+        targetCtx.save();
+
+        targetCtx.strokeStyle = "#b4a0ff";
+        targetCtx.lineWidth = 2;
+        targetCtx.setLineDash([5, 4]);
+
+        targetCtx.beginPath();
+        targetCtx.arc(x, y, size * 0.68, 0, Math.PI * 2);
+        targetCtx.stroke();
+
+        targetCtx.restore();
+      }
+    });
+  }
+
+  function draw() {
+    if (!canvas) return;
+
+    ctx = fitCanvas(canvas);
+    drawItems(ctx, items, selectedId);
+  }
+
+  function addItem(emoji, isDecoy = false) {
+    const item = {
+      id: `piece-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+      emoji,
+      x: 45 + Math.random() * 10,
+      y: 43 + Math.random() * 12,
+      size: 1,
+      rotation: 0,
+      tint: currentTint,
+      isDecoy
     };
 
-    userLayers.push(newLayer);
-    selectedLayerIndex = userLayers.length - 1; // Auto-select the newly added part
-    redrawWorkspace();
-}
+    items.push(item);
+    selectedId = item.id;
 
-/**
- * Populates the color palette selection swatches
- */
-function setupColorPalette(palette) {
-    const paletteContainer = document.getElementById('color-palette');
-    if (!paletteContainer) return;
+    syncControls();
+    draw();
+    onChange(items);
+  }
 
-    paletteContainer.innerHTML = '';
+  function syncControls() {
+    const item = items.find(x => x.id === selectedId);
 
-    palette.forEach((hexColor, index) => {
-        const swatch = document.createElement('div');
-        swatch.className = 'color-swatch';
-        swatch.style.backgroundColor = hexColor;
-        if (index === 0) swatch.classList.add('active');
+    $("size-control").disabled = !item;
+    $("rotate-button").disabled = !item;
+    $("duplicate-button").disabled = !item;
+    $("delete-button").disabled = !item;
 
-        swatch.addEventListener('click', () => {
-            // Update active visual state
-            document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-            swatch.classList.add('active');
+    $("selection-hint").textContent = item
+      ? `Selected: ${item.emoji}`
+      : "Select a piece on the canvas to edit it.";
 
-            // Apply color to selected layer if one is active
-            if (selectedLayerIndex !== null && userLayers[selectedLayerIndex]) {
-                userLayers[selectedLayerIndex].color = hexColor;
-                redrawWorkspace();
-            }
-        });
+    $("size-control").value = item ? item.size : 1;
 
-        paletteContainer.appendChild(swatch);
+    $("size-value").textContent =
+      `${Number(item?.size || 1).toFixed(1)}×`;
+
+    document.querySelectorAll(".swatch").forEach(button => {
+      button.classList.toggle(
+        "selected",
+        button.dataset.tint === (item?.tint || currentTint)
+      );
     });
-}
+  }
 
-/**
- * Handles mouse events for selecting and dragging parts on the canvas
- */
-function setupCanvasListeners() {
-    const canvas = document.getElementById('editor-canvas');
-    if (!canvas) return;
+  function setItems(newItems) {
+    items = (newItems || []).map((item, i) => ({
+      ...item,
+      id: item.id || `piece-${i}`,
+      x: Number(item.x) || 50,
+      y: Number(item.y) || 50,
+      size: Number(item.size) || 1,
+      rotation: Number(item.rotation) || 0,
+      tint: item.tint || "#ffffff"
+    }));
 
-    canvas.addEventListener('mousedown', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
+    selectedId = null;
 
-        // Check layers from top-to-bottom (end of array to start)
-        selectedLayerIndex = null;
-        for (let i = userLayers.length - 1; i >= 0; i--) {
-            const layer = userLayers[i];
-            // Simple distance check from click to layer center
-            const distance = Math.hypot(mouseX - layer.x, mouseY - layer.y);
-            if (distance < 50 * layer.scale) {
-                selectedLayerIndex = i;
-                isDragging = true;
-                dragOffsetX = mouseX - layer.x;
-                dragOffsetY = mouseY - layer.y;
-                break;
-            }
+    syncControls();
+    draw();
+    onChange(items);
+  }
+
+  function getItems() {
+    return items.map(item => ({ ...item }));
+  }
+
+  function renderStatic(targetCanvas, list) {
+    const targetContext = fitCanvas(targetCanvas);
+    drawItems(targetContext, list || []);
+  }
+
+  function init(options) {
+    onChange = options.onChange || (() => {});
+
+    setupCanvas($("editor-canvas"));
+
+    // Resize selected piece.
+    $("size-control").addEventListener("input", event => {
+      const item = items.find(x => x.id === selectedId);
+      if (!item) return;
+
+      item.size = Number(event.target.value);
+
+      $("size-value").textContent = `${item.size.toFixed(1)}×`;
+
+      draw();
+      onChange(items);
+    });
+
+    // Rotate selected piece by 45 degrees.
+    $("rotate-button").addEventListener("click", () => {
+      const item = items.find(x => x.id === selectedId);
+      if (!item) return;
+
+      item.rotation = ((item.rotation || 0) + 45) % 360;
+
+      draw();
+      onChange(items);
+    });
+
+    // Duplicate selected piece.
+    $("duplicate-button").addEventListener("click", () => {
+      const item = items.find(x => x.id === selectedId);
+      if (!item) return;
+
+      const copy = {
+        ...item,
+        id: `piece-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+        x: Math.min(92, item.x + 7),
+        y: Math.min(90, item.y + 7)
+      };
+
+      items.push(copy);
+      selectedId = copy.id;
+
+      syncControls();
+      draw();
+      onChange(items);
+    });
+
+    // Remove selected piece.
+    $("delete-button").addEventListener("click", () => {
+      items = items.filter(x => x.id !== selectedId);
+      selectedId = null;
+
+      syncControls();
+      draw();
+      onChange(items);
+    });
+
+    // Change selected piece tint.
+    $("color-palette").addEventListener("click", event => {
+      const button = event.target.closest(".swatch");
+      if (!button) return;
+
+      currentTint = button.dataset.tint;
+
+      const item = items.find(x => x.id === selectedId);
+
+      if (item) {
+        item.tint = currentTint;
+      }
+
+      syncControls();
+      draw();
+      onChange(items);
+    });
+  }
+
+  function renderTray(tray) {
+    const el = $("emoji-tray");
+    el.innerHTML = "";
+
+    tray.forEach(entry => {
+      const button = document.createElement("button");
+
+      button.className = "tray-item";
+      button.type = "button";
+      button.draggable = true;
+      button.textContent = entry.emoji;
+
+      button.title = entry.isDecoy
+        ? "Decoy piece"
+        : "Add " + entry.emoji;
+
+      // Tapping an emoji adds it.
+      button.addEventListener("click", () => {
+        addItem(entry.emoji, entry.isDecoy);
+      });
+
+      // Dragging an emoji from the tray.
+      button.addEventListener("dragstart", event => {
+        event.dataTransfer.setData(
+          "text/plain",
+          JSON.stringify(entry)
+        );
+
+        event.dataTransfer.effectAllowed = "copy";
+      });
+
+      const small = document.createElement("small");
+      small.textContent = entry.isDecoy ? "?" : "+";
+
+      button.appendChild(small);
+      el.appendChild(button);
+    });
+
+    // Set up drag-and-drop only once.
+    if (!dropBound) {
+      canvas.addEventListener("dragover", event => {
+        event.preventDefault();
+      });
+
+      canvas.addEventListener("drop", event => {
+        event.preventDefault();
+
+        try {
+          const entry = JSON.parse(
+            event.dataTransfer.getData("text/plain")
+          );
+
+          if (entry?.emoji) {
+            addItem(entry.emoji, entry.isDecoy);
+          }
+        } catch (_) {
+          // Ignore invalid drag data.
         }
-        redrawWorkspace();
-    });
+      });
 
-    canvas.addEventListener('mousemove', (e) => {
-        if (!isDragging || selectedLayerIndex === null) return;
+      dropBound = true;
+    }
+  }
 
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
+  function setMessage(message) {
+    $("editor-message").textContent = message || "";
+  }
 
-        userLayers[selectedLayerIndex].x = mouseX - dragOffsetX;
-        userLayers[selectedLayerIndex].y = mouseY - dragOffsetY;
-        redrawWorkspace();
-    });
-
-    window.addEventListener('mouseup', () => {
-        isDragging = false;
-    });
-}
-
-/**
- * Hooks up transformation buttons (Rotate, Scale, Duplicate, Delete)
- */
-function setupToolButtons() {
-    // Rotate 45 degrees
-    document.getElementById('btn-rotate')?.addEventListener('click', () => {
-        if (selectedLayerIndex === null) return;
-        let layer = userLayers[selectedLayerIndex];
-        layer.rotation = (layer.rotation + 45) % 360;
-        redrawWorkspace();
-    });
-
-    // Scale Up
-    document.getElementById('btn-scale-up')?.addEventListener('click', () => {
-        if (selectedLayerIndex === null) return;
-        let layer = userLayers[selectedLayerIndex];
-        if (layer.scale < 1.8) {
-            layer.scale = parseFloat((layer.scale + 0.1).toFixed(1));
-            redrawWorkspace();
-        }
-    });
-
-    // Scale Down
-    document.getElementById('btn-scale-down')?.addEventListener('click', () => {
-        if (selectedLayerIndex === null) return;
-        let layer = userLayers[selectedLayerIndex];
-        if (layer.scale > 0.5) {
-            layer.scale = parseFloat((layer.scale - 0.1).toFixed(1));
-            redrawWorkspace();
-        }
-    });
-
-    // Duplicate selected part
-    document.getElementById('btn-duplicate')?.addEventListener('click', () => {
-        if (selectedLayerIndex === null) return;
-        const target = userLayers[selectedLayerIndex];
-        const clone = {
-            ...target,
-            instanceId: Date.now() + Math.random(),
-            x: target.x + 15,
-            y: target.y + 15
-        };
-        userLayers.push(clone);
-        selectedLayerIndex = userLayers.length - 1;
-        redrawWorkspace();
-    });
-
-    // Delete selected part
-    document.getElementById('btn-delete')?.addEventListener('click', () => {
-        if (selectedLayerIndex === null) return;
-        userLayers.splice(selectedLayerIndex, 1);
-        selectedLayerIndex = null;
-        redrawWorkspace();
-    });
-}
-
-/**
- * Redraws the workspace canvas and highlights the currently selected layer
- */
-function redrawWorkspace() {
-    const canvas = document.getElementById('editor-canvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw all user layers
-    userLayers.forEach((layer, index) => {
-        ctx.save();
-        ctx.translate(layer.x, layer.y);
-        ctx.rotate((layer.rotation * Math.PI) / 180);
-        ctx.scale(layer.scale, layer.scale);
-
-        ctx.fillStyle = layer.color;
-        ctx.strokeStyle = "#121214";
-        ctx.lineWidth = 4;
-
-        drawPartPath(ctx, layer.id);
-        ctx.restore();
-
-        // If this layer is selected, draw a selection bounding ring
-        if (index === selectedLayerIndex) {
-            ctx.save();
-            ctx.strokeStyle = "#3b82f6";
-            ctx.lineWidth = 2;
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.arc(layer.x, layer.y, 55 * layer.scale, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.restore();
-        }
-    });
-}
-
-/**
-     * Clears the editor state (used when starting a new game round)
-     */
-function resetEditorWorkspace() {
-    userLayers = [];
-    selectedLayerIndex = null;
-    redrawWorkspace();
-}
-
+  window.EmojiEditor = {
+    init,
+    renderTray,
+    setItems,
+    getItems,
+    renderStatic,
+    setMessage
+  };
+})();
