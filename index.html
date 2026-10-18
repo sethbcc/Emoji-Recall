@@ -4,88 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Emoji Recall</title>
-    <!-- Link to CSS stylesheet -->
+    
+    <!-- 1. Link your separate CSS file here -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- Game Title Header -->
+    <!-- Game Content Goes Here -->
     <header>
         <h1>Emoji Recall</h1>
-        <p>Memorize the emoji and reconstruct it before time runs out!</p>
     </header>
 
-    <!-- Main Game Container -->
     <main>
-        
-        <!-- Screen 1: Target Preview Screen (10-Second Memorization) -->
-        <section id="preview-screen">
-            <h2>Memorize This Emoji!</h2>
-            <div id="timer">Time Remaining: <span id="time-left">10</span>s</div>
-            <!-- Canvas where the target emoji will render -->
-            <canvas id="target-canvas" width="300" height="300"></canvas>
-        </section>
-
-        <!-- Screen 2: Assembly Workspace (Reconstruction Phase) -->
-        <section id="workspace-screen" class="hidden">
-            <h2>Reconstruct the Emoji</h2>
-            
-            <div class="game-area">
-                <!-- Part Selector Tray (Decoys + Real Parts) -->
-                <div id="part-tray" class="tray">
-                    <h3>Parts Tray</h3>
-                    <!-- Parts/Icons will be dynamically injected here via JS -->
-                </div>
-
-                <!-- Interactive Assembly Canvas -->
-                <div class="canvas-container">
-                    <canvas id="editor-canvas" width="300" height="300"></canvas>
-                </div>
-
-                <!-- Controls & Palette -->
-                <div id="controls">
-                    <h3>Palette & Tools</h3>
-                    <!-- Color Swatches -->
-                    <div id="color-palette"></div>
-                    
-                    <!-- Transformation Buttons -->
-                    <button id="btn-rotate">Rotate 45°</button>
-                    <button id="btn-scale-up">Scale Up</button>
-                    <button id="btn-scale-down">Scale Down</button>
-                    <button id="btn-duplicate">Duplicate</button>
-                    <button id="btn-delete">Delete</button>
-                </div>
-            </div>
-
-            <button id="btn-submit">Submit Reconstruction</button>
-        </section>
-
-        <!-- Screen 3: Results & Social Share Card -->
-        <section id="results-screen" class="hidden">
-            <h2>Results</h2>
-            <div class="score-display">
-                <h3>Accuracy: <span id="accuracy-score">0</span>%</h3>
-            </div>
-            
-            <!-- Side-by-side "Expectation vs. Reality" Canvas -->
-            <div class="comparison-container">
-                <div>
-                    <h4>Target (Expectation)</h4>
-                    <canvas id="final-target" width="200" height="200"></canvas>
-                </div>
-                <div>
-                    <h4>Your Creation (Reality)</h4>
-                    <canvas id="final-creation" width="200" height="200"></canvas>
-                </div>
-            </div>
-
-            <button id="btn-share">Share Result</button>
-            <button id="btn-play-again">Play Again</button>
-        </section>
-
+        <!-- Screens will go here -->
     </main>
 
-    <!-- Script imports at the bottom so HTML loads first -->
+    <!-- 2. Link your separate JavaScript files at the bottom -->
+    <!-- The order matters: load helper logic first, then game.js last -->
     <script src="generator.js"></script>
     <script src="editor.js"></script>
     <script src="scorer.js"></script>
@@ -93,4 +28,3 @@
 
 </body>
 </html>
-
