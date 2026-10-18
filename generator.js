@@ -1,107 +1,234 @@
-/**
- * Vector drawing instructions for each part type (Mobile-Safe Version)
- */
-function drawPartPath(ctx, partId) {
-    ctx.beginPath();
+(() => {
+  "use strict";
 
-    switch (partId) {
-        // Bases
-        case 'base_circle':
-            ctx.arc(0, 0, 80, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-            break;
-        case 'base_square':
-            ctx.rect(-70, -70, 140, 140);
-            ctx.fill();
-            ctx.stroke();
-            break;
-        case 'base_pill':
-            ctx.roundRect ? ctx.roundRect(-60, -80, 120, 160, 50) : ctx.rect(-60, -80, 120, 160);
-            ctx.fill();
-            ctx.stroke();
-            break;
+  const EMOJI_POOL = [
+    "😀", "😎", "🥹", "🤖", "🐱", "🐸",
+    "🦊", "🐼", "🐵", "🐻", "🐰", "🐯",
+    "👑", "🎩", "🎀", "🕶️", "⭐", "🌟",
+    "💎", "🔥", "🌈", "⚡", "🍀", "🌸",
+    "🦋", "🎈", "🍓", "🍉", "🍄", "🪐",
+    "🌙", "☀️", "💫", "🎧", "🪽", "🧢",
+    "🧁", "🍭", "🛸", "👻", "🎃", "💖",
+    "🧿", "🪄", "🥝", "🐝"
+  ];
 
-        // Eyes
-        case 'eyes_dots':
-            ctx.arc(-30, -15, 12, 0, Math.PI * 2);
-            ctx.arc(30, -15, 12, 0, Math.PI * 2);
-            ctx.fill();
-            break;
-        case 'eyes_stars':
-            drawStar(ctx, -30, -15, 15);
-            drawStar(ctx, 30, -15, 15);
-            break;
-        case 'eyes_hearts':
-            drawHeart(ctx, -30, -15, 15);
-            drawHeart(ctx, 30, -15, 15);
-            break;
-        case 'eyes_lines':
-            ctx.rect(-45, -20, 30, 8);
-            ctx.rect(15, -20, 30, 8);
-            ctx.fill();
-            break;
+  const TINTS = [
+    "#ffffff",
+    "#ff718b",
+    "#ffc857",
+    "#72e6bd",
+    "#75a7ff",
+    "#c69bff"
+  ];
 
-        // Mouths
-        case 'mouth_smile':
-            ctx.arc(0, 10, 35, 0, Math.PI, false);
-            ctx.lineTo(-35, 10);
-            ctx.fill();
-            ctx.stroke();
-            break;
-        case 'mouth_open':
-            ctx.arc(0, 15, 20, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-            break;
-        case 'mouth_flat':
-            ctx.rect(-30, 15, 60, 10);
-            ctx.fill();
-            break;
-        case 'mouth_cat':
-            ctx.moveTo(-20, 15);
-            ctx.quadraticCurveTo(-10, 30, 0, 15);
-            ctx.quadraticCurveTo(10, 30, 20, 15);
-            ctx.stroke();
-            break;
+  const rand = max => Math.floor(Math.random() * max);
 
-        // Accessories
-        case 'acc_horns':
-            ctx.moveTo(-40, -60);
-            ctx.lineTo(-60, -100);
-            ctx.lineTo(-20, -75);
-            ctx.closePath();
-            ctx.moveTo(40, -60);
-            ctx.lineTo(60, -100);
-            ctx.lineTo(20, -75);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            break;
-        case 'acc_antenna':
-            ctx.rect(-4, -110, 8, 40);
-            ctx.fill();
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(0, -115, 12, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-            break;
-        case 'acc_halo':
-            ctx.ellipse(0, -95, 40, 15, 0, 0, Math.PI * 2);
-            ctx.stroke();
-            break;
-        case 'acc_ears':
-            ctx.moveTo(-50, -60);
-            ctx.lineTo(-70, -110);
-            ctx.lineTo(-20, -80);
-            ctx.closePath();
-            ctx.moveTo(50, -60);
-            ctx.lineTo(70, -110);
-            ctx.lineTo(20, -80);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            break;
+  const pick = list => list[rand(list.length)];
+
+  const clamp = (n, min, max) =>
+    Math.max(min, Math.min(max, n));
+
+  // Creates a random character without using an API.
+  function makeDemoDesign() {
+    const face = pick([
+      "😎", "😀", "🥹", "🤖", "🐱", "🐸",
+      "🦊", "🐼", "🐵", "🐻", "🐰", "🐯"
+    ]);
+
+    const count = 4 + rand(3);
+    const chosen = [face];
+
+    while (chosen.length < count) {
+      const next = pick(EMOJI_POOL);
+
+      if (!chosen.includes(next)) {
+        chosen.push(next);
+      }
     }
-}
+
+    // Percentage-based positions on the canvas.
+    const spots = [
+      { x: 50, y: 50, size: 1.45 },
+      { x: 50, y: 20, size: 0.82 },
+      { x: 24, y: 43, size: 0.76 },
+      { x: 76, y: 43, size: 0.76 },
+      { x: 31, y: 75, size: 0.72 },
+      { x: 69, y: 75, size: 0.72 }
+    ];
+
+    const items = chosen.map((emoji, i) => ({
+      id: `target-${i}`,
+      emoji,
+
+      x: spots[i].x + (
+        i === 0 ? 0 : rand(13) - 6
+      ),
+
+      y: spots[i].y + (
+        i === 0 ? 0 : rand(13) - 6
+      ),
+
+      size: spots[i].size * (
+        i === 0 ? 1 : 0.8 + Math.random() * 0.4
+      ),
+
+      rotation: pick([0, 0, 45, 315, 90, 270]),
+
+      tint: pick(TINTS),
+
+      isDecoy: false
+    }));
+
+    // Keep the main face in its original color.
+    items[0].tint = "#ffffff";
+
+    return {
+      items,
+      source: "demo"
+    };
+  }
+
+  // Requests a design from your own backend, if configured.
+  async function generateDesign() {
+    const endpoint = (
+      window.EMOJI_RECALL_AI_ENDPOINT || ""
+    ).trim();
+
+    if (endpoint) {
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json"
+          },
+
+          body: JSON.stringify({
+            task: "Create a fun, balanced emoji collage for a memory puzzle.",
+
+            allowedEmojis: EMOJI_POOL,
+
+            allowedTints: TINTS,
+
+            itemCount: 5 + rand(2)
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `AI server responded ${response.status}`
+          );
+        }
+
+        const raw = await response.json();
+
+        const sourceItems = Array.isArray(raw)
+          ? raw
+          : raw.items;
+
+        if (
+          !Array.isArray(sourceItems) ||
+          sourceItems.length < 3
+        ) {
+          throw new Error(
+            "AI response did not contain enough items"
+          );
+        }
+
+        const items = sourceItems.slice(0, 7).map(
+          (item, i) => ({
+            id: `target-${i}`,
+
+            // Reject emoji outside the approved pool.
+            emoji: EMOJI_POOL.includes(item.emoji)
+              ? item.emoji
+              : pick(EMOJI_POOL),
+
+            x: clamp(Number(item.x) || 50, 8, 92),
+
+            y: clamp(Number(item.y) || 50, 10, 90),
+
+            size: clamp(
+              Number(item.size) || 1,
+              0.5,
+              1.7
+            ),
+
+            rotation:
+              Math.round(
+                (Number(item.rotation) || 0) / 45
+              ) * 45,
+
+            tint: TINTS.includes(item.tint)
+              ? item.tint
+              : "#ffffff",
+
+            isDecoy: false
+          })
+        );
+
+        return {
+          items,
+          source: "ai"
+        };
+
+      } catch (error) {
+        console.warn(
+          "AI generation failed; using a local design instead.",
+          error
+        );
+
+        return {
+          ...makeDemoDesign(),
+          source: "demo-fallback"
+        };
+      }
+    }
+
+    // No backend configured: use the local generator.
+    return makeDemoDesign();
+  }
+
+  // Adds fake emoji to the player's tray.
+  function makeTray(targetItems) {
+    const decoys = [];
+
+    const used = new Set(
+      targetItems.map(item => item.emoji)
+    );
+
+    while (decoys.length < 7) {
+      const emoji = pick(EMOJI_POOL);
+
+      if (!used.has(emoji)) {
+        used.add(emoji);
+
+        decoys.push({
+          id: `decoy-${decoys.length}`,
+          emoji,
+          isDecoy: true
+        });
+      }
+    }
+
+    const realPieces = targetItems.map((item, i) => ({
+      id: `tray-${i}`,
+      emoji: item.emoji,
+      isDecoy: false
+    }));
+
+    // Mix real pieces and decoys.
+    return [
+      ...realPieces,
+      ...decoys
+    ].sort(() => Math.random() - 0.5);
+  }
+
+  window.EmojiGenerator = {
+    generateDesign,
+    makeTray,
+    makeDemoDesign,
+    EMOJI_POOL,
+    TINTS
+  };
+})();
